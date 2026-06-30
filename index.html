@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>Tally — Family Game Scorekeeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --cream:#FFF8EC;
+    --cream-deep:#FBEFD9;
+    --coral:#FF6B6B;
+    --coral-dark:#E8514F;
+    --teal:#4ECDC4;
+    --teal-dark:#33B0A6;
+    --gold:#FFD93D;
+    --gold-dark:#F2C200;
+    --plum:#6C5CE7;
+    --plum-dark:#5645C9;
+    --ink:#2D2A26;
+    --ink-soft:#6B6359;
+    --line:#EFE2C4;
+    --white:#FFFFFF;
+    --shadow: 0 4px 0 rgba(45,42,38,0.12);
+    --radius: 20px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 8% 0%, rgba(255,217,61,0.18), transparent 40%),
+      radial-gradient(circle at 95% 10%, rgba(108,92,231,0.10), transparent 40%),
+      var(--cream);
+    color:var(--ink);
+    font-family:'Nunito', sans-serif;
+    min-height:100vh;
+    padding-bottom:90px;
+  }
+  h1,h2,h3,.display{ font-family:'Fredoka', sans-serif; font-weight:600; margin:0; }
+  button{ font-family:inherit; cursor:pointer; }
+  .app{ max-width:560px; margin:0 auto; padding:18px 16px 0; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 2px 18px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .mark{
+    width:40px;height:40px;border-radius:14px;
+    background:linear-gradient(135deg,var(--coral),var(--gold));
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px; box-shadow:var(--shadow);
+    transform:rotate(-6deg);
+  }
+  .brand h1{ font-size:24px; letter-spacing:-0.02em; }
+  .brand .sub{ font-size:11px; color:var(--ink-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-top:-2px;}
+  .icon-btn{
+    width:42px;height:42px;border-radius:50%;border:2px solid var(--line);
+    background:var(--white); display:flex;align-items:center;justify-content:center;
+    font-size:18px; box-shadow:var(--shadow);
+  }
+  .icon-btn:active{ transform:translateY(2px); box-shadow:none; }
+
+  /* ---------- Cards ---------- */
+  .card{
+    background:var(--white);
+    border-radius:var(--radius);
+    border:2px solid var(--line);
+    box-shadow:var(--shadow);
+    padding:18px;
+    margin-bottom:16px;
+  }
+  .card-title{ font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-soft); margin-bottom:12px; }
+
+  /* ---------- Filters ---------- */
+  .filters{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; scrollbar-width:none; }
+  .filters::-webkit-scrollbar{display:none;}
+  select.chip, .chip-btn{
+    flex:0 0 auto;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    font-family:'Nunito',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    padding:8px 14px;
+    border-radius:999px;
+    appearance:none;
+  }
+  .chip-btn.active{ background:var(--plum); color:white; border-color:var(--plum); }
+
+  /* ---------- Leaderboard ---------- */
+  .lb-row{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 6px;
+    border-bottom:1px dashed var(--line);
+  }
+  .lb-row:last-child{ border-bottom:none; }
+  .lb-rank{
+    width:26px; text-align:center; font-family:'Fredoka',sans-serif; font-weight:600;
+    color:var(--ink-soft); font-size:15px;
+  }
+  .lb-rank.gold{ color:var(--gold-dark); font-size:20px; }
+  .avatar{
+    width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px; color:white; flex-shrink:0;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.15);
+  }
+  .avatar.sm{ width:32px;height:32px; font-size:15px; }
+  .lb-name{ flex:1; font-weight:800; font-size:15px; }
+  .lb-meta{ font-size:11px; color:var(--ink-soft); font-weight:700; }
+  .lb-wins{ font-family:'Fredoka',sans-serif; font-size:22px; font-weight:600; min-width:34px; text-align:right;}
+  .lb-wins-label{ font-size:10px; color:var(--ink-soft); text-align:right; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;}
+
+  .empty{
+    text-align:center; padding:30px 10px; color:var(--ink-soft);
+  }
+  .empty .big{ font-size:38px; margin-bottom:8px; }
+  .empty p{ font-weight:700; margin:4px 0 0; font-size:14px; }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:16px;
+    padding:14px 18px; font-weight:800; font-size:15px;
+    box-shadow:var(--shadow);
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:none; }
+  .btn-primary{ background:var(--coral); color:white; }
+  .btn-teal{ background:var(--teal); color:white; }
+  .btn-plum{ background:var(--plum); color:white; }
+  .btn-gold{ background:var(--gold); color:var(--ink); }
+  .btn-outline{ background:var(--white); color:var(--ink); border:2px solid var(--line); box-shadow:none; }
+  .btn-block{ width:100%; }
+  .btn-sm{ padding:9px 14px; font-size:13px; border-radius:12px; }
+  .btn:disabled{ opacity:0.45; }
+
+  /* ---------- Game/player chips list ---------- */
+  .chip-list{ display:flex; flex-wrap:wrap; gap:8px; }
+  .pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--cream-deep); border-radius:999px; padding:6px 12px 6px 6px;
+    font-weight:800; font-size:13px;
+  }
+
+  .game-row{
+    display:flex; align-items:center; gap:12px; padding:14px 6px;
+    border-bottom:1px dashed var(--line);
+  }
+  .game-row:last-child{ border-bottom:none; }
+  .game-icon{
+    width:42px;height:42px;border-radius:12px;background:var(--cream-deep);
+    display:flex;align-items:center;justify-content:center; font-size:20px;
+  }
+  .game-name{ font-weight:800; font-size:15px; }
+  .game-meta{ font-size:11px; color:var(--ink-soft); font-weight:700; }
+
+  /* ---------- Bottom nav ---------- */
+  .bottomnav{
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--white); border-top:2px solid var(--line);
+    display:flex; justify-content:space-around;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    z-index:50;
+  }
+  .nav-btn{
+    background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:2px;
+    color:var(--ink-soft); font-weight:800; font-size:10px; padding:6px 14px; border-radius:12px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .nav-btn .ic{ font-size:20px; }
+  .nav-btn.active{ color:var(--coral); }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(45,42,38,0.45);
+    display:none; align-items:flex-end; justify-content:center; z-index:200;
+  }
+  .modal-backdrop.show{ display:flex; }
+  .modal{
+    background:var(--cream); width:100%; max-width:560px;
+    border-radius:24px 24px 0 0; padding:22px 18px calc(22px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+    animation: slideUp 0.25s ease-out;
+  }
+  @keyframes slideUp{ from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .modal-head h2{ font-size:21px; }
+
+  label.field-label{ display:block; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin:14px 0 6px; }
+  input[type=text], input[type=number], input[type=date], select.field{
+    width:100%; border:2px solid var(--line); background:var(--white);
+    border-radius:14px; padding:12px 14px; font-size:15px; font-family:inherit; font-weight:700; color:var(--ink);
+  }
+  input:focus, select:focus{ outline:2px solid var(--plum); outline-offset:1px; }
+
+  .swatches{ display:flex; flex-wrap:wrap; gap:10px; }
+  .swatch{
+    width:38px;height:38px;border-radius:50%; border:3px solid transparent; position:relative;
+  }
+  .swatch.selected{ border-color:var(--ink); }
+  .icon-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .icon-opt{
+    width:42px;height:42px;border-radius:12px; border:2px solid var(--line); background:var(--white);
+    display:flex;align-items:center;justify-content:center; font-size:20px;
+  }
+  .icon-opt.selected{ border-color:var(--plum); background:var(--cream-deep); }
+
+  .seg{ display:flex; border:2px solid var(--line); border-radius:14px; overflow:hidden; }
+  .seg button{ flex:1; border:none; background:var(--white); padding:12px; font-weight:800; font-size:13px; color:var(--ink-soft); }
+  .seg button.selected{ background:var(--plum); color:white; }
+
+  .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+  .modal-actions .btn{ flex:1; }
+
+  /* ---------- Play screen ---------- */
+  .score-row{
+    padding:12px;
+    background:var(--white); border:2px solid var(--line); border-radius:16px; margin-bottom:10px;
+  }
+  .score-top{ display:flex; align-items:center; gap:10px; }
+  .score-name{ flex:1; font-weight:800; font-size:15px; }
+  .score-total-box{ display:flex; flex-direction:column; align-items:center; }
+  .score-total-label{ font-size:9px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; }
+  .score-controls{ display:flex; align-items:center; gap:8px; }
+  .score-step{
+    width:30px;height:30px;border-radius:9px; border:2px solid var(--line); background:var(--cream-deep);
+    font-family:'Fredoka',sans-serif; font-size:16px; font-weight:600; color:var(--ink);
+  }
+  .score-step:active{ background:var(--gold); }
+  .score-val{ width:58px; text-align:center; font-family:'Fredoka',sans-serif; font-size:21px; border:2px solid var(--line); border-radius:10px; padding:6px 0; font-weight:600;}
+  .round-add{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+  .round-add input{
+    flex:1; border:2px solid var(--line); background:var(--cream-deep); border-radius:12px;
+    padding:9px 12px; font-family:inherit; font-weight:700; font-size:14px; color:var(--ink); width:auto;
+  }
+  .round-add-btn{
+    flex:0 0 auto; border:none; background:var(--plum); color:white; font-weight:800; font-size:13px;
+    padding:10px 16px; border-radius:12px;
+  }
+  .round-add-btn:active{ background:var(--plum-dark); }
+
+  .winner-badge{ font-size:11px; font-weight:800; color:var(--gold-dark); }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:white; padding:12px 20px; border-radius:14px; font-weight:700; font-size:14px;
+    opacity:0; pointer-events:none; transition:all 0.25s ease; z-index:300; white-space:nowrap;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* confetti */
+  .confetti-piece{
+    position:fixed; top:-10px; width:8px; height:14px; z-index:500; pointer-events:none;
+    animation: fall linear forwards;
+  }
+  @keyframes fall{
+    to{ transform: translateY(100vh) rotate(540deg); opacity:0.2; }
+  }
+
+  .section-hidden{ display:none; }
+
+  .player-row{ display:flex; align-items:center; gap:12px; padding:12px 6px; border-bottom:1px dashed var(--line); }
+  .player-row:last-child{ border-bottom:none;}
+  .player-row .avatar{ cursor:pointer; }
+  .ghost-actions{ display:flex; gap:6px; }
+  .text-btn{ background:none;border:none;color:var(--ink-soft);font-weight:800;font-size:12px;padding:6px;}
+  .text-btn.danger{ color:var(--coral-dark); }
+
+  .history-card{ padding:14px; border:2px solid var(--line); border-radius:16px; margin-bottom:10px; background:var(--white); }
+  .history-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .history-game{ font-weight:800; font-size:15px; }
+  .history-date{ font-size:11px; color:var(--ink-soft); font-weight:700; }
+  .history-scores{ display:flex; flex-wrap:wrap; gap:8px; }
+  .hs-pill{ display:flex; align-items:center; gap:6px; background:var(--cream-deep); border-radius:999px; padding:5px 10px 5px 5px; font-size:12px; font-weight:800; }
+  .hs-pill.win{ background:#FFF1B8; }
+
+  .fab-row{ display:flex; gap:10px; margin-bottom:16px; }
+
+  /* ---------- Player Stats ---------- */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:14px; }
+  .stat-box{
+    background:var(--cream-deep); border-radius:16px; padding:14px 8px; text-align:center;
+  }
+  .stat-num{ font-family:'Fredoka',sans-serif; font-size:26px; font-weight:600; color:var(--ink); }
+  .stat-label{ font-size:10px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; margin-top:2px; }
+  .stat-highlight{
+    background:linear-gradient(135deg, rgba(255,217,61,0.35), rgba(255,159,67,0.18));
+    border:2px solid var(--gold); border-radius:16px; padding:14px 16px;
+  }
+  .stat-highlight-label{ font-size:11px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;}
+  .stat-highlight-val{ font-family:'Fredoka',sans-serif; font-size:17px; font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">🎲</div>
+      <div>
+        <h1>Tally</h1>
+        <div class="sub">Game Night Scoreboard</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard">
+    <div class="filters" id="filterBar">
+      <select class="chip" id="gameFilter"><option value="all">All games</option></select>
+      <select class="chip" id="dateFilter">
+        <option value="all">All time</option>
+        <option value="year">This year</option>
+        <option value="month">This month</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏆 Leaderboard</div>
+      <div id="leaderboardList"></div>
+    </div>
+
+    <div class="fab-row">
+      <button class="btn btn-primary btn-block" id="startGameBtn">▶️ Start a Game</button>
+    </div>
+
+    <div class="card" id="recentCard">
+      <div class="card-title">🕘 Recent Games</div>
+      <div id="recentList"></div>
+    </div>
+  </div>
+
+  <!-- PLAYERS -->
+  <div id="view-players" class="section-hidden">
+    <div class="card">
+      <div class="card-title">👥 Players</div>
+      <div id="playersList"></div>
+    </div>
+    <button class="btn btn-teal btn-block" id="addPlayerBtn">＋ Add Player</button>
+  </div>
+
+  <!-- GAMES -->
+  <div id="view-games" class="section-hidden">
+    <div class="card">
+      <div class="card-title">🎯 Games</div>
+      <div id="gamesList"></div>
+    </div>
+    <button class="btn btn-gold btn-block" id="addGameBtn">＋ Add Game</button>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="view-history" class="section-hidden">
+    <div class="card">
+      <div class="card-title">📜 All Games Played</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="bottomnav">
+  <button class="nav-btn active" data-view="dashboard"><span class="ic">🏠</span>Board</button>
+  <button class="nav-btn" data-view="players"><span class="ic">👤</span>Players</button>
+  <button class="nav-btn" data-view="games"><span class="ic">🎯</span>Games</button>
+  <button class="nav-btn" data-view="history"><span class="ic">📜</span>History</button>
+</div>
+
+<div id="toast"></div>
+
+<!-- MODALS -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<input type="file" id="importFile" accept="application/json" style="display:none;">
+
+<script>
+/* ============ STATE ============ */
+const STORAGE_KEY = 'tally_data_v1';
+const ICONS = ['🦊','🐯','🐸','🐼','🦁','🐨','🐵','🦄','🐙','🐲','⚡','🔥','🌟','🍕','🎮','🚀','🏆','🍀','🎯','🥳'];
+const COLORS = ['#FF6B6B','#4ECDC4','#FFD93D','#6C5CE7','#FF9F43','#1DD1A1','#FD79A8','#54A0FF','#9B59B6','#2ECC71'];
+
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { players: [], games: [], matches: [] };
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ============ TOAST ============ */
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+}
+
+/* ============ CONFETTI ============ */
+function confettiBurst(){
+  const colors = [COLORS[0],COLORS[1],COLORS[2],COLORS[3],COLORS[4]];
+  for(let i=0;i<28;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = (45 + Math.random()*10) + 'vw';
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration = (1.2 + Math.random()*0.9) + 's';
+    p.style.transform = `rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(), 2300);
+  }
+}
+
+/* ============ NAV ============ */
+const views = ['dashboard','players','games','history'];
+function showView(name){
+  views.forEach(v=>{
+    document.getElementById('view-'+v).classList.toggle('section-hidden', v!==name);
+  });
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.view===name);
+  });
+  if(name==='dashboard') renderDashboard();
+  if(name==='players') renderPlayers();
+  if(name==='games') renderGames();
+  if(name==='history') renderHistory();
+}
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  b.addEventListener('click', ()=> showView(b.dataset.view));
+});
+
+/* ============ MODAL HELPERS ============ */
+const backdrop = document.getElementById('modalBackdrop');
+const modalEl = document.getElementById('modalContent');
+function openModal(html){
+  modalEl.innerHTML = html;
+  backdrop.classList.add('show');
+}
+function closeModal(){
+  backdrop.classList.remove('show');
+  modalEl.innerHTML = '';
+}
+backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
+
+/* ============ DASHBOARD ============ */
+function populateGameFilter(){
+  const sel = document.getElementById('gameFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">All games</option>' +
+    state.games.map(g=>`<option value="${g.id}">${g.icon} ${escapeHtml(g.name)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
+function getFilteredMatches(){
+  const gameId = document.getElementById('gameFilter').value;
+  const dateFilter = document.getElementById('dateFilter').value;
+  const now = new Date();
+  return state.matches.filter(m=>{
+    if(!m.completed) return false;
+    if(gameId!=='all' && m.gameId!==gameId) return false;
+    if(dateFilter!=='all'){
+      const d = new Date(m.date);
+      if(dateFilter==='year' && d.getFullYear()!==now.getFullYear()) return false;
+      if(dateFilter==='month' && (d.getFullYear()!==now.getFullYear() || d.getMonth()!==now.getMonth())) return false;
+    }
+    return true;
+  });
+}
+
+function renderDashboard(){
+  populateGameFilter();
+  const matches = getFilteredMatches();
+  const winCounts = {};
+  const playedCounts = {};
+  matches.forEach(m=>{
+    m.scores.forEach(s=>{ playedCounts[s.playerId] = (playedCounts[s.playerId]||0)+1; });
+    if(m.winnerId){ winCounts[m.winnerId] = (winCounts[m.winnerId]||0)+1; }
+  });
+  const ranked = state.players
+    .map(p=>({ p, wins: winCounts[p.id]||0, played: playedCounts[p.id]||0 }))
+    .filter(r=> r.played>0)
+    .sort((a,b)=> b.wins - a.wins || b.played - a.played);
+
+  const list = document.getElementById('leaderboardList');
+  if(ranked.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">🪄</div><p>No games match these filters yet.</p></div>`;
+  } else {
+    list.innerHTML = ranked.map((r,i)=>{
+      const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+      return `<div class="lb-row">
+        <div class="lb-rank ${i===0?'gold':''}">${medal}</div>
+        <div class="avatar" style="background:${r.p.color}">${r.p.icon}</div>
+        <div style="flex:1">
+          <div class="lb-name">${escapeHtml(r.p.name)}</div>
+          <div class="lb-meta">${r.played} game${r.played===1?'':'s'} played</div>
+        </div>
+        <div>
+          <div class="lb-wins">${r.wins}</div>
+          <div class="lb-wins-label">Wins</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const recent = [...state.matches].filter(m=>m.completed).sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,5);
+  const recentList = document.getElementById('recentList');
+  if(recent.length===0){
+    recentList.innerHTML = `<div class="empty"><div class="big">🎲</div><p>Start a game to fill this in!</p></div>`;
+  } else {
+    recentList.innerHTML = recent.map(matchSummaryHtml).join('');
+  }
+}
+['gameFilter','dateFilter'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderDashboard);
+});
+
+function matchSummaryHtml(m){
+  const game = state.games.find(g=>g.id===m.gameId);
+  const winner = state.players.find(p=>p.id===m.winnerId);
+  return `<div class="history-card">
+    <div class="history-top">
+      <div>
+        <div class="history-game">${game?game.icon:'🎲'} ${game?escapeHtml(game.name):'Deleted game'}</div>
+        <div class="history-date">${formatDate(m.date)}</div>
+      </div>
+      ${winner?`<div class="winner-badge">🏆 ${escapeHtml(winner.name)}</div>`:''}
+    </div>
+    <div class="history-scores">
+      ${m.scores.map(s=>{
+        const p = state.players.find(pp=>pp.id===s.playerId);
+        if(!p) return '';
+        const isWin = s.playerId===m.winnerId;
+        return `<div class="hs-pill ${isWin?'win':''}"><span class="avatar sm" style="background:${p.color}">${p.icon}</span>${escapeHtml(p.name)}: ${s.score}</div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/* ============ PLAYERS ============ */
+function renderPlayers(){
+  const list = document.getElementById('playersList');
+  if(state.players.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">🙋</div><p>Add your first player to get started.</p></div>`;
+    return;
+  }
+  list.innerHTML = state.players.map(p=>`
+    <div class="player-row">
+      <div class="avatar" style="background:${p.color}" onclick="openPlayerStats('${p.id}')">${p.icon}</div>
+      <div style="flex:1; cursor:pointer;" onclick="openPlayerStats('${p.id}')">
+        <div class="lb-name">${escapeHtml(p.name)}</div>
+        <div class="lb-meta">Tap to view stats →</div>
+      </div>
+      <div class="ghost-actions">
+        <button class="text-btn" onclick="openPlayerModal('${p.id}')">Edit</button>
+        <button class="text-btn danger" onclick="deletePlayer('${p.id}')">Remove</button>
+      </div>
+    </div>
+  `).join('');
+}
+document.getElementById('addPlayerBtn').addEventListener('click', ()=> openPlayerModal());
+
+function openPlayerModal(playerId){
+  const editing = playerId ? state.players.find(p=>p.id===playerId) : null;
+  const color = editing ? editing.color : COLORS[state.players.length % COLORS.length];
+  const icon = editing ? editing.icon : ICONS[state.players.length % ICONS.length];
+  openModal(`
+    <div class="modal-head"><h2>${editing?'Edit Player':'Add Player'}</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <label class="field-label">Name</label>
+    <input type="text" id="pName" placeholder="e.g. Laynie" value="${editing?escapeHtml(editing.name):''}">
+    <label class="field-label">Color</label>
+    <div class="swatches" id="pColors">
+      ${COLORS.map(c=>`<button type="button" class="swatch ${c===color?'selected':''}" style="background:${c}" data-color="${c}"></button>`).join('')}
+    </div>
+    <label class="field-label">Icon</label>
+    <div class="icon-grid" id="pIcons">
+      ${ICONS.map(ic=>`<button type="button" class="icon-opt ${ic===icon?'selected':''}" data-icon="${ic}">${ic}</button>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="savePlayerBtn">${editing?'Save':'Add Player'}</button>
+    </div>
+  `);
+  let selColor = color, selIcon = icon;
+  document.querySelectorAll('#pColors .swatch').forEach(s=>{
+    s.addEventListener('click', ()=>{
+      selColor = s.dataset.color;
+      document.querySelectorAll('#pColors .swatch').forEach(x=>x.classList.remove('selected'));
+      s.classList.add('selected');
+    });
+  });
+  document.querySelectorAll('#pIcons .icon-opt').forEach(s=>{
+    s.addEventListener('click', ()=>{
+      selIcon = s.dataset.icon;
+      document.querySelectorAll('#pIcons .icon-opt').forEach(x=>x.classList.remove('selected'));
+      s.classList.add('selected');
+    });
+  });
+  document.getElementById('savePlayerBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('pName').value.trim();
+    if(!name){ toast("Give your player a name first"); return; }
+    if(editing){
+      editing.name = name; editing.color = selColor; editing.icon = selIcon;
+      toast('Player updated');
+    } else {
+      state.players.push({ id: uid(), name, color: selColor, icon: selIcon });
+      toast('Player added 🎉');
+    }
+    saveState();
+    closeModal();
+    renderPlayers();
+  });
+}
+function deletePlayer(id){
+  const p = state.players.find(x=>x.id===id);
+  if(!p) return;
+  openModal(`
+    <div class="modal-head"><h2>Remove ${escapeHtml(p.name)}?</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600;">Past games stay in history, but ${escapeHtml(p.name)} will no longer be available to add to new games.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="background:var(--coral-dark)" onclick="confirmDeletePlayer('${id}')">Remove</button>
+    </div>
+  `);
+}
+function confirmDeletePlayer(id){
+  state.players = state.players.filter(p=>p.id!==id);
+  saveState();
+  closeModal();
+  renderPlayers();
+  toast('Player removed');
+}
+
+/* ---- Player Stats ---- */
+function getPlacement(match, playerId){
+  // returns 1-indexed place for playerId in this match (dense ranking, ties share a place)
+  const game = state.games.find(g=>g.id===match.gameId);
+  if(!game) return null;
+  const sorted = [...match.scores].sort((a,b)=> game.direction==='high' ? b.score-a.score : a.score-b.score);
+  let place = 1;
+  let lastScore = null;
+  const placements = {};
+  sorted.forEach((s,i)=>{
+    if(lastScore!==null && s.score!==lastScore) place = i+1;
+    placements[s.playerId] = place;
+    lastScore = s.score;
+  });
+  return placements[playerId] || null;
+}
+
+function openPlayerStats(playerId){
+  const p = state.players.find(x=>x.id===playerId);
+  if(!p) return;
+  const playerMatches = state.matches
+    .filter(m=>m.completed && m.scores.some(s=>s.playerId===playerId))
+    .sort((a,b)=> new Date(b.date)-new Date(a.date));
+
+  let firsts=0, seconds=0, thirds=0;
+  const gameWinCounts = {};
+  playerMatches.forEach(m=>{
+    const place = getPlacement(m, playerId);
+    if(place===1) firsts++;
+    else if(place===2) seconds++;
+    else if(place===3) thirds++;
+    if(m.winnerId===playerId){
+      gameWinCounts[m.gameId] = (gameWinCounts[m.gameId]||0)+1;
+    }
+  });
+  const totalGames = playerMatches.length;
+  const winRate = totalGames>0 ? Math.round((firsts/totalGames)*100) : 0;
+
+  let mostWonGame = null, mostWonCount = 0;
+  Object.entries(gameWinCounts).forEach(([gameId,count])=>{
+    if(count>mostWonCount){ mostWonCount = count; mostWonGame = gameId; }
+  });
+  const mostWonGameObj = mostWonGame ? state.games.find(g=>g.id===mostWonGame) : null;
+
+  // current streak: consecutive wins starting from most recent match
+  let streak = 0;
+  for(const m of playerMatches){
+    if(m.winnerId===playerId) streak++;
+    else break;
+  }
+
+  openModal(`
+    <div class="modal-head"><h2><span class="avatar sm" style="background:${p.color}">${p.icon}</span> ${escapeHtml(p.name)}</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-num">${firsts}</div>
+        <div class="stat-label">🥇 Wins</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${seconds}</div>
+        <div class="stat-label">🥈 2nd Place</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${thirds}</div>
+        <div class="stat-label">🥉 3rd Place</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${winRate}%</div>
+        <div class="stat-label">Win Rate</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${totalGames}</div>
+        <div class="stat-label">Games Played</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${streak>0?streak:'—'}</div>
+        <div class="stat-label">🔥 Win Streak</div>
+      </div>
+    </div>
+    <div class="stat-highlight">
+      <div class="stat-highlight-label">Most Won Game</div>
+      <div class="stat-highlight-val">${mostWonGameObj ? mostWonGameObj.icon+' '+escapeHtml(mostWonGameObj.name)+' ('+mostWonCount+' win'+(mostWonCount===1?'':'s')+')' : 'No wins yet'}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+/* ============ GAMES ============ */
+function renderGames(){
+  const list = document.getElementById('gamesList');
+  if(state.games.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">🎯</div><p>Add a game to start keeping score.</p></div>`;
+    return;
+  }
+  list.innerHTML = state.games.map(g=>{
+    const playedCount = state.matches.filter(m=>m.gameId===g.id && m.completed).length;
+    return `<div class="game-row">
+      <div class="game-icon">${g.icon}</div>
+      <div style="flex:1">
+        <div class="game-name">${escapeHtml(g.name)}</div>
+        <div class="game-meta">${g.direction==='low'?'Lowest score wins':'Highest score wins'} · ${playedCount} played</div>
+      </div>
+      <div class="ghost-actions">
+        <button class="text-btn" onclick="openGameModal('${g.id}')">Edit</button>
+        <button class="text-btn danger" onclick="deleteGame('${g.id}')">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+document.getElementById('addGameBtn').addEventListener('click', ()=> openGameModal());
+
+const GAME_ICONS = ['🎲','🃏','♟️','🀄','🎯','🏓','🧩','🎳','🀫','🪙','🕹️','🐉'];
+function openGameModal(gameId){
+  const editing = gameId ? state.games.find(g=>g.id===gameId) : null;
+  const icon = editing ? editing.icon : GAME_ICONS[state.games.length % GAME_ICONS.length];
+  const direction = editing ? editing.direction : 'high';
+  openModal(`
+    <div class="modal-head"><h2>${editing?'Edit Game':'Add Game'}</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <label class="field-label">Game name</label>
+    <input type="text" id="gName" placeholder="e.g. Settlers of Catan" value="${editing?escapeHtml(editing.name):''}">
+    <label class="field-label">Winning condition</label>
+    <div class="seg" id="gDirection">
+      <button type="button" data-dir="high" class="${direction==='high'?'selected':''}">Highest score wins</button>
+      <button type="button" data-dir="low" class="${direction==='low'?'selected':''}">Lowest score wins</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-teal" id="saveGameBtn">${editing?'Save':'Add Game'}</button>
+    </div>
+  `);
+  let selIcon = icon, selDir = direction;
+  document.querySelectorAll('#gDirection button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      selDir = b.dataset.dir;
+      document.querySelectorAll('#gDirection button').forEach(x=>x.classList.remove('selected'));
+      b.classList.add('selected');
+    });
+  });
+  document.getElementById('saveGameBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('gName').value.trim();
+    if(!name){ toast("Give the game a name first"); return; }
+    if(editing){
+      editing.name = name; editing.icon = selIcon; editing.direction = selDir;
+      toast('Game updated');
+    } else {
+      state.games.push({ id: uid(), name, icon: selIcon, direction: selDir });
+      toast('Game added 🎲');
+    }
+    saveState();
+    closeModal();
+    renderGames();
+  });
+}
+function deleteGame(id){
+  const g = state.games.find(x=>x.id===id);
+  if(!g) return;
+  openModal(`
+    <div class="modal-head"><h2>Remove ${escapeHtml(g.name)}?</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600;">Past games stay in history, but you won't be able to start new matches of ${escapeHtml(g.name)}.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="background:var(--coral-dark)" onclick="confirmDeleteGame('${id}')">Remove</button>
+    </div>
+  `);
+}
+function confirmDeleteGame(id){
+  state.games = state.games.filter(g=>g.id!==id);
+  saveState();
+  closeModal();
+  renderGames();
+  toast('Game removed');
+}
+
+/* ============ HISTORY ============ */
+function renderHistory(){
+  const list = document.getElementById('historyList');
+  const all = [...state.matches].filter(m=>m.completed).sort((a,b)=> new Date(b.date)-new Date(a.date));
+  if(all.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">📭</div><p>No completed games yet.</p></div>`;
+    return;
+  }
+  list.innerHTML = all.map(m=>`
+    <div style="position:relative;">
+      ${matchSummaryHtml(m)}
+      <div style="display:flex; gap:8px; margin:-6px 0 14px;">
+        <button class="text-btn" onclick="editMatchDate('${m.id}')">Edit date</button>
+        <button class="text-btn danger" onclick="deleteMatch('${m.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+function editMatchDate(matchId){
+  const m = state.matches.find(x=>x.id===matchId);
+  if(!m) return;
+  openModal(`
+    <div class="modal-head"><h2>Edit Date</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <label class="field-label">Date played</label>
+    <input type="date" id="editDateInput" value="${m.date.slice(0,10)}">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMatchDate('${matchId}')">Save</button>
+    </div>
+  `);
+}
+function saveMatchDate(matchId){
+  const m = state.matches.find(x=>x.id===matchId);
+  const val = document.getElementById('editDateInput').value;
+  if(!val) return;
+  m.date = new Date(val + 'T12:00:00').toISOString();
+  saveState();
+  closeModal();
+  renderHistory();
+  renderDashboard();
+  toast('Date updated');
+}
+function deleteMatch(matchId){
+  state.matches = state.matches.filter(m=>m.id!==matchId);
+  saveState();
+  renderHistory();
+  toast('Game removed from history');
+}
+
+/* ============ START GAME FLOW ============ */
+document.getElementById('startGameBtn').addEventListener('click', ()=>{
+  if(state.games.length===0){ toast('Add a game first 🎯'); showView('games'); return; }
+  if(state.players.length<2){ toast('Add at least 2 players first 👥'); showView('players'); return; }
+  openSetupModal();
+});
+
+function openSetupModal(){
+  openModal(`
+    <div class="modal-head"><h2>New Game</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <label class="field-label">Which game?</label>
+    <select class="field" id="setupGame">
+      ${state.games.map(g=>`<option value="${g.id}">${g.icon} ${escapeHtml(g.name)}</option>`).join('')}
+    </select>
+    <label class="field-label">Date played</label>
+    <input type="date" id="setupDate" value="${todayStr()}">
+    <label class="field-label">Who's playing?</label>
+    <div class="chip-list" id="setupPlayers">
+      ${state.players.map(p=>`<button type="button" class="chip-btn" data-pid="${p.id}">${p.icon} ${escapeHtml(p.name)}</button>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="beginBtn">Begin Game ▶️</button>
+    </div>
+  `);
+  const selected = new Set();
+  document.querySelectorAll('#setupPlayers .chip-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.dataset.pid;
+      if(selected.has(id)){ selected.delete(id); b.classList.remove('active'); }
+      else { selected.add(id); b.classList.add('active'); }
+    });
+  });
+  document.getElementById('beginBtn').addEventListener('click', ()=>{
+    if(selected.size<2){ toast('Pick at least 2 players'); return; }
+    const gameId = document.getElementById('setupGame').value;
+    const date = document.getElementById('setupDate').value || todayStr();
+    const match = {
+      id: uid(),
+      gameId,
+      date: new Date(date + 'T12:00:00').toISOString(),
+      scores: [...selected].map(pid=>({ playerId: pid, score: 0 })),
+      winnerId: null,
+      completed: false
+    };
+    state.matches.push(match);
+    saveState();
+    closeModal();
+    openPlayScreen(match.id);
+  });
+}
+
+/* ============ PLAY SCREEN ============ */
+function openPlayScreen(matchId){
+  const m = state.matches.find(x=>x.id===matchId);
+  const g = state.games.find(x=>x.id===m.gameId);
+  renderPlayScreen(m, g);
+}
+function renderPlayScreen(m, g){
+  openModal(`
+    <div class="modal-head"><h2>${g.icon} ${escapeHtml(g.name)}</h2><button class="icon-btn" onclick="exitPlayScreen('${m.id}')">✕</button></div>
+    <div class="game-meta" style="margin:-10px 0 14px;">${g.direction==='low'?'Lowest score wins':'Highest score wins'} · ${formatDate(m.date)}</div>
+    <div id="scoreRows">
+      ${m.scores.map(s=>{
+        const p = state.players.find(pp=>pp.id===s.playerId);
+        return `<div class="score-row">
+          <div class="score-top">
+            <div class="avatar sm" style="background:${p.color}">${p.icon}</div>
+            <div class="score-name">${escapeHtml(p.name)}</div>
+            <div class="score-controls">
+              <button class="score-step" onclick="adjustScore('${m.id}','${p.id}',-1)">−</button>
+              <input type="number" class="score-val" id="score_${p.id}" value="${s.score}" onchange="setScore('${m.id}','${p.id}',this.value)">
+              <button class="score-step" onclick="adjustScore('${m.id}','${p.id}',1)">+</button>
+            </div>
+          </div>
+          <div class="round-add">
+            <input type="number" placeholder="Add round score…" id="round_${p.id}" inputmode="numeric">
+            <button type="button" class="round-add-btn" onclick="addRoundScore('${m.id}','${p.id}')">+ Add to total</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="exitPlayScreen('${m.id}')">Save & Pause</button>
+      <button class="btn btn-gold" onclick="endGame('${m.id}')">🏁 End Game</button>
+    </div>
+  `);
+}
+function adjustScore(matchId, playerId, delta){
+  const m = state.matches.find(x=>x.id===matchId);
+  const s = m.scores.find(x=>x.playerId===playerId);
+  s.score += delta;
+  saveState();
+  document.getElementById('score_'+playerId).value = s.score;
+}
+function setScore(matchId, playerId, value){
+  const m = state.matches.find(x=>x.id===matchId);
+  const s = m.scores.find(x=>x.playerId===playerId);
+  s.score = parseInt(value,10) || 0;
+  saveState();
+}
+function addRoundScore(matchId, playerId){
+  const input = document.getElementById('round_'+playerId);
+  const roundVal = parseInt(input.value, 10);
+  if(isNaN(roundVal) || roundVal===0){ toast('Enter how many points that round'); return; }
+  const m = state.matches.find(x=>x.id===matchId);
+  const s = m.scores.find(x=>x.playerId===playerId);
+  s.score += roundVal;
+  saveState();
+  document.getElementById('score_'+playerId).value = s.score;
+  input.value = '';
+  input.blur();
+}
+function exitPlayScreen(matchId){
+  saveState();
+  closeModal();
+  toast('Saved — find it under History to resume');
+  renderDashboard();
+}
+function endGame(matchId){
+  const m = state.matches.find(x=>x.id===matchId);
+  const g = state.games.find(x=>x.id===m.gameId);
+  let best = m.scores[0];
+  m.scores.forEach(s=>{
+    if(g.direction==='high' ? s.score>best.score : s.score<best.score) best = s;
+  });
+  // handle ties: collect all tied
+  const tied = m.scores.filter(s=> s.score===best.score);
+  if(tied.length>1){
+    openTieBreakModal(m, g, tied);
+    return;
+  }
+  finalizeMatch(m, best.playerId);
+}
+function openTieBreakModal(m, g, tied){
+  openModal(`
+    <div class="modal-head"><h2>It's a tie!</h2><button class="icon-btn" onclick="exitPlayScreen('${m.id}')">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600;">Pick the winner, or leave it tied with no winner recorded.</p>
+    <div class="chip-list" style="margin-top:10px;">
+      ${tied.map(s=>{
+        const p = state.players.find(pp=>pp.id===s.playerId);
+        return `<button type="button" class="chip-btn" onclick="finalizeMatch(state.matches.find(x=>x.id==='${m.id}'), '${p.id}')">${p.icon} ${escapeHtml(p.name)}</button>`;
+      }).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" onclick="finalizeMatch(state.matches.find(x=>x.id==='${m.id}'), null)">No winner — record as a tie</button>
+    </div>
+  `);
+}
+function finalizeMatch(m, winnerId){
+  m.completed = true;
+  m.winnerId = winnerId;
+  saveState();
+  closeModal();
+  if(winnerId) confettiBurst();
+  const winner = state.players.find(p=>p.id===winnerId);
+  toast(winner ? `🎉 ${winner.name} wins!` : 'Game recorded as a tie');
+  showView('dashboard');
+}
+
+/* ============ SETTINGS / EXPORT-IMPORT ============ */
+document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+function openSettingsModal(){
+  openModal(`
+    <div class="modal-head"><h2>Settings</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600; font-size:14px;">Back up your data or move it to another device or browser.</p>
+    <div class="modal-actions" style="flex-direction:column;">
+      <button class="btn btn-teal btn-block" id="exportBtn">⬇️ Export data (.json)</button>
+      <button class="btn btn-outline btn-block" id="importBtn">⬆️ Import data</button>
+    </div>
+    <p style="color:var(--ink-soft); font-weight:600; font-size:12px; margin-top:16px;">Importing replaces all current players, games, and history on this device.</p>
+  `);
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tally-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('Exported!');
+}
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      if(!data.players || !data.games || !data.matches) throw new Error('bad shape');
+      state = { players: data.players, games: data.games, matches: data.matches };
+      saveState();
+      closeModal();
+      toast('Data imported ✅');
+      showView('dashboard');
+    }catch(err){
+      toast('That file could not be read — check it\'s a Tally export');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ============ UTILS ============ */
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+function formatDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+}
+
+/* ============ INIT ============ */
+renderDashboard();
+</script>
+</body>
+</html>
