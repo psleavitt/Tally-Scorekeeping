@@ -645,6 +645,7 @@ function getFilteredMatches(){
 }
 
 let rankMode = 'wins'; // 'wins' or 'pct'
+let qpGame = null; // active Quick Play match — never touches localStorage or the cloud
 
 function renderDashboard(){
   populateGameFilter();
@@ -1102,54 +1103,166 @@ function deleteMatch(matchId){
 
 /* ============ START GAME FLOW ============ */
 function startNewGameFlow(){
-  if(state.games.length===0){ toast('Add a game first 🎯'); showView('games'); return; }
-  if(state.players.length<2){ toast('Add at least 2 players first 👥'); showView('players'); return; }
   openSetupModal();
 }
 
 function openSetupModal(){
-  openModal(`
-    <div class="modal-head"><h2>New Game</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
-    <label class="field-label">Which game?</label>
-    <select class="field" id="setupGame">
-      ${state.games.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
-    </select>
-    <label class="field-label">Date played</label>
-    <input type="date" id="setupDate" value="${todayStr()}">
-    <label class="field-label">Who's playing?</label>
-    <div class="chip-list" id="setupPlayers">
-      ${state.players.map(p=>`<button type="button" class="chip-btn" data-pid="${p.id}">${p.icon} ${escapeHtml(p.name)}</button>`).join('')}
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="beginBtn">Begin Game ▶️</button>
-    </div>
-  `);
-  const selected = new Set();
-  document.querySelectorAll('#setupPlayers .chip-btn').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      const id = b.dataset.pid;
-      if(selected.has(id)){ selected.delete(id); b.classList.remove('active'); }
-      else { selected.add(id); b.classList.add('active'); }
+  const hasSavedSetup = state.games.length>0 && state.players.length>=2;
+  let setupMode = hasSavedSetup ? 'saved' : 'quick';
+  let qpDraftGuests = []; // {id, name, color, icon} — this modal's working list, discarded if cancelled
+
+  function renderModal(){
+    openModal(`
+      <div class="modal-head"><h2>New Game</h2><button class="icon-btn" onclick="closeModal()">✕</button></div>
+      <div class="seg" id="setupModeToggle">
+        <button type="button" data-mode="saved" class="${setupMode==='saved'?'selected':''}">Saved Game</button>
+        <button type="button" data-mode="quick" class="${setupMode==='quick'?'selected':''}">⚡ Quick Play</button>
+      </div>
+
+      <div id="savedGameFields" class="${setupMode==='saved'?'':'section-hidden'}" style="margin-top:14px;">
+        ${state.games.length===0 ? `<p style="color:var(--ink-soft); font-weight:600; font-size:13px; margin-top:10px;">No saved games yet — add one on the Games tab, or use Quick Play for a game that doesn't need saving.</p>` : `
+        <label class="field-label">Which game?</label>
+        <select class="field" id="setupGame">
+          ${state.games.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+        </select>
+        <label class="field-label">Date played</label>
+        <input type="date" id="setupDate" value="${todayStr()}">
+        <label class="field-label">Who's playing?</label>
+        <div class="chip-list" id="setupPlayers">
+          ${state.players.map(p=>`<button type="button" class="chip-btn" data-pid="${p.id}">${p.icon} ${escapeHtml(p.name)}</button>`).join('')}
+        </div>
+        ${state.players.length<2?`<p style="color:var(--ink-soft); font-weight:600; font-size:13px; margin-top:8px;">Add at least 2 players on the Players tab first.</p>`:''}
+        `}
+      </div>
+
+      <div id="quickPlayFields" class="${setupMode==='quick'?'':'section-hidden'}" style="margin-top:14px;">
+        <p style="color:var(--ink-soft); font-weight:600; font-size:12px; background:var(--cream-deep); padding:10px 12px; border-radius:12px;">⚡ Quick Play games and players aren't saved anywhere — nothing shows up in History, the Leaderboard, or Player Stats. Good for a one-off game with guests.</p>
+        <label class="field-label">Game name</label>
+        <input type="text" id="qpGameName" placeholder="e.g. Charades">
+        <label class="field-label">Winning condition</label>
+        <div class="seg" id="qpDirection">
+          <button type="button" data-dir="high" class="selected">Highest score wins</button>
+          <button type="button" data-dir="low">Lowest score wins</button>
+        </div>
+        <label class="field-label">Players</label>
+        <div class="round-add" style="border-top:none; margin-top:0; padding-top:0;">
+          <input type="text" id="qpGuestName" placeholder="Type a name…">
+          <button type="button" class="round-add-btn" id="qpAddGuestBtn">+ Add</button>
+        </div>
+        <div class="chip-list" id="qpGuestList" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="beginBtn">Begin Game ▶️</button>
+      </div>
+    `);
+    wireUp();
+  }
+
+  function renderGuestChips(){
+    const list = document.getElementById('qpGuestList');
+    if(!list) return;
+    if(qpDraftGuests.length===0){
+      list.innerHTML = `<span style="color:var(--ink-soft); font-weight:600; font-size:13px;">No players added yet</span>`;
+      return;
+    }
+    list.innerHTML = qpDraftGuests.map(g=>`
+      <div class="pill" style="background:${g.color}22;">
+        <span class="avatar sm" style="background:${g.color}">${g.icon}</span>
+        ${escapeHtml(g.name)}
+        <button type="button" onclick="event.stopPropagation();" data-remove="${g.id}" style="background:none;border:none;font-weight:800;color:var(--ink-soft);cursor:pointer;padding:0 2px;">✕</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-remove]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        qpDraftGuests = qpDraftGuests.filter(g=>g.id!==btn.dataset.remove);
+        renderGuestChips();
+      });
     });
-  });
-  document.getElementById('beginBtn').addEventListener('click', ()=>{
-    if(selected.size<2){ toast('Pick at least 2 players'); return; }
-    const gameId = document.getElementById('setupGame').value;
-    const date = document.getElementById('setupDate').value || todayStr();
-    const match = {
+  }
+
+  function addGuest(){
+    const input = document.getElementById('qpGuestName');
+    const name = input.value.trim();
+    if(!name){ toast('Type a name first'); return; }
+    const idx = qpDraftGuests.length;
+    qpDraftGuests.push({
       id: uid(),
-      gameId,
-      date: new Date(date + 'T12:00:00').toISOString(),
-      scores: [...selected].map(pid=>({ playerId: pid, score: 0 })),
-      winnerId: null,
-      completed: false
-    };
-    state.matches.push(match);
-    saveState();
-    closeModal();
-    openPlayScreen(match.id);
-  });
+      name,
+      color: COLORS[idx % COLORS.length],
+      icon: ICONS[idx % ICONS.length]
+    });
+    input.value = '';
+    input.focus();
+    renderGuestChips();
+  }
+
+  function wireUp(){
+    document.querySelectorAll('#setupModeToggle button').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        setupMode = b.dataset.mode;
+        renderModal();
+      });
+    });
+
+    if(setupMode==='saved'){
+      const selected = new Set();
+      document.querySelectorAll('#setupPlayers .chip-btn').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = b.dataset.pid;
+          if(selected.has(id)){ selected.delete(id); b.classList.remove('active'); }
+          else { selected.add(id); b.classList.add('active'); }
+        });
+      });
+      document.getElementById('beginBtn').addEventListener('click', ()=>{
+        if(state.games.length===0){ toast('Add a game first 🎯'); return; }
+        if(selected.size<2){ toast('Pick at least 2 players'); return; }
+        const gameId = document.getElementById('setupGame').value;
+        const date = document.getElementById('setupDate').value || todayStr();
+        const match = {
+          id: uid(),
+          gameId,
+          date: new Date(date + 'T12:00:00').toISOString(),
+          scores: [...selected].map(pid=>({ playerId: pid, score: 0 })),
+          winnerId: null,
+          completed: false
+        };
+        state.matches.push(match);
+        saveState();
+        closeModal();
+        openPlayScreen(match.id);
+      });
+    } else {
+      renderGuestChips();
+      let qpDir = 'high';
+      document.querySelectorAll('#qpDirection button').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          qpDir = b.dataset.dir;
+          document.querySelectorAll('#qpDirection button').forEach(x=>x.classList.remove('selected'));
+          b.classList.add('selected');
+        });
+      });
+      document.getElementById('qpAddGuestBtn').addEventListener('click', addGuest);
+      document.getElementById('qpGuestName').addEventListener('keydown', (e)=>{
+        if(e.key==='Enter'){ e.preventDefault(); addGuest(); }
+      });
+      document.getElementById('beginBtn').addEventListener('click', ()=>{
+        const name = document.getElementById('qpGameName').value.trim();
+        if(!name){ toast('Give the game a name first'); return; }
+        if(qpDraftGuests.length<2){ toast('Add at least 2 players'); return; }
+        qpGame = {
+          name,
+          direction: qpDir,
+          players: qpDraftGuests.map(g=>({ ...g, score: 0 }))
+        };
+        closeModal();
+        openQuickPlayScreen();
+      });
+    }
+  }
+
+  renderModal();
 }
 
 /* ============ PLAY SCREEN ============ */
@@ -1286,6 +1399,132 @@ function undoFinalizeMatch(matchId){
   saveState();
   toast('Undone — game reopened for scoring');
   openPlayScreen(matchId);
+}
+
+/* ============ QUICK PLAY (ephemeral — never saved) ============ */
+function qpSortedPlayers(){
+  return [...qpGame.players].sort((a,b)=> qpGame.direction==='high' ? b.score-a.score : a.score-b.score);
+}
+function openQuickPlayScreen(){
+  qpRenderPlayScreen();
+}
+function qpRenderPlayScreen(){
+  openModal(`
+    <div class="modal-head"><h2>⚡ ${escapeHtml(qpGame.name)}</h2><button class="icon-btn" onclick="qpConfirmExit()">✕</button></div>
+    <div class="game-meta" style="margin:-10px 0 14px;">${qpGame.direction==='low'?'Lowest score wins':'Highest score wins'} · Quick Play — not saved</div>
+    <div id="qpScoreRows">${qpRenderScoreRows()}</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="qpConfirmExit()">Cancel Game</button>
+      <button class="btn btn-gold" onclick="qpEndGame()">🏁 End Game</button>
+    </div>
+  `);
+}
+function qpRenderScoreRows(){
+  return qpSortedPlayers().map((p,i)=>{
+    const medal = i===0 ? (qpGame.direction==='high'?'🥇':'🎯') : '';
+    return `<div class="score-row">
+      <div class="score-top">
+        <div class="avatar sm" style="background:${p.color}">${p.icon}</div>
+        <div class="score-name">${escapeHtml(p.name)} <span style="font-size:14px;">${medal}</span></div>
+        <div class="score-controls">
+          <button class="score-step" onclick="qpAdjustScore('${p.id}',-1)">−</button>
+          <input type="number" class="score-val" id="qpScore_${p.id}" value="${p.score}" onchange="qpSetScore('${p.id}',this.value)">
+          <button class="score-step" onclick="qpAdjustScore('${p.id}',1)">+</button>
+        </div>
+      </div>
+      <div class="round-add">
+        <input type="number" placeholder="Add round score…" id="qpRound_${p.id}" inputmode="numeric">
+        <button type="button" class="round-add-btn" onclick="qpAddRoundScore('${p.id}')">+ Add to total</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function qpRefreshScoreRows(){
+  const container = document.getElementById('qpScoreRows');
+  if(container) container.innerHTML = qpRenderScoreRows();
+}
+function qpAdjustScore(playerId, delta){
+  const p = qpGame.players.find(x=>x.id===playerId);
+  p.score += delta;
+  qpRefreshScoreRows();
+}
+function qpSetScore(playerId, value){
+  const p = qpGame.players.find(x=>x.id===playerId);
+  p.score = parseInt(value,10) || 0;
+  qpRefreshScoreRows();
+}
+function qpAddRoundScore(playerId){
+  const input = document.getElementById('qpRound_'+playerId);
+  const roundVal = parseInt(input.value, 10);
+  if(isNaN(roundVal) || roundVal===0){ toast('Enter how many points that round'); return; }
+  const p = qpGame.players.find(x=>x.id===playerId);
+  p.score += roundVal;
+  qpRefreshScoreRows();
+}
+function qpConfirmExit(){
+  openModal(`
+    <div class="modal-head"><h2>Cancel this game?</h2><button class="icon-btn" onclick="qpRenderPlayScreen()">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600;">Quick Play scores aren't saved anywhere — closing now discards everything for ${escapeHtml(qpGame.name)}.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="qpRenderPlayScreen()">Keep Playing</button>
+      <button class="btn btn-primary" style="background:var(--coral-dark)" onclick="qpDone()">Discard</button>
+    </div>
+  `);
+}
+function qpEndGame(){
+  let best = qpGame.players[0];
+  qpGame.players.forEach(p=>{
+    if(qpGame.direction==='high' ? p.score>best.score : p.score<best.score) best = p;
+  });
+  const tied = qpGame.players.filter(p=> p.score===best.score);
+  if(tied.length>1){ qpOpenTieBreak(tied); return; }
+  qpShowGameOver(best.id);
+}
+function qpOpenTieBreak(tied){
+  openModal(`
+    <div class="modal-head"><h2>It's a tie!</h2><button class="icon-btn" onclick="qpRenderPlayScreen()">✕</button></div>
+    <p style="color:var(--ink-soft); font-weight:600;">Pick the winner, or leave it tied with no winner declared.</p>
+    <div class="chip-list" style="margin-top:10px;">
+      ${tied.map(p=>`<button type="button" class="chip-btn" onclick="qpShowGameOver('${p.id}')">${p.icon} ${escapeHtml(p.name)}</button>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" onclick="qpShowGameOver(null)">No winner — record as a tie</button>
+    </div>
+  `);
+}
+function qpShowGameOver(winnerId){
+  const winner = winnerId ? qpGame.players.find(p=>p.id===winnerId) : null;
+  if(winner) { confettiBurst(); playWinSound(); }
+  openModal(`
+    <div class="modal-head"><h2>${winner?'🏆 Game Over!':'Game Over'}</h2><button class="icon-btn" onclick="qpDone()">✕</button></div>
+    ${winner ? `<p style="font-family:'Fredoka',sans-serif; font-size:20px; font-weight:600; margin-bottom:14px;">${winner.icon} ${escapeHtml(winner.name)} wins ${escapeHtml(qpGame.name)}!</p>` : `<p style="color:var(--ink-soft); font-weight:700; margin-bottom:14px;">Recorded as a tie in ${escapeHtml(qpGame.name)}.</p>`}
+    <div>
+      ${qpSortedPlayers().map(p=>`
+        <div class="lb-row">
+          <div class="avatar sm" style="background:${p.color}">${p.icon}</div>
+          <div style="flex:1"><div class="lb-name">${escapeHtml(p.name)}</div></div>
+          <div class="lb-wins">${p.score}</div>
+        </div>
+      `).join('')}
+    </div>
+    <p style="color:var(--ink-soft); font-weight:600; font-size:12px; margin-top:10px;">⚡ Quick Play — this game was not saved.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="qpRenderPlayScreen()">Back to Scoring</button>
+      <button class="btn btn-teal" onclick="qpPlayAgain()">Play Again</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-block" onclick="qpDone()">Done</button>
+    </div>
+  `);
+}
+function qpPlayAgain(){
+  qpGame.players.forEach(p=> p.score = 0);
+  qpRenderPlayScreen();
+}
+function qpDone(){
+  qpGame = null;
+  closeModal();
+  showView('dashboard');
 }
 
 /* ============ SETTINGS / EXPORT-IMPORT ============ */
