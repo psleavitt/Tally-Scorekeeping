@@ -422,7 +422,18 @@ function cloudConfigured(){ return SUPABASE_URL.startsWith('https://') && SUPABA
 function cloudActive(){ return cloudConfigured() && !!householdCode; }
 
 const SYNC_TABLES = { players:'tally_players', games:'tally_games', matches:'tally_matches' };
-let lastSynced = { players:{}, games:{}, matches:{} };
+const LAST_SYNCED_KEY = 'tally_last_synced_v1';
+function loadLastSynced(){
+  try{
+    const raw = localStorage.getItem(LAST_SYNCED_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { players:{}, games:{}, matches:{} };
+}
+function persistLastSynced(){
+  localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify(lastSynced));
+}
+let lastSynced = loadLastSynced();
 let syncTimer = null;
 let syncState = 'off'; // off | syncing | synced | error
 
@@ -446,6 +457,7 @@ function takeSnapshot(){
     lastSynced[k] = {};
     state[k].forEach(item=>{ lastSynced[k][item.id] = JSON.stringify(item); });
   });
+  persistLastSynced();
 }
 
 function setSyncStatus(s){
@@ -467,21 +479,74 @@ async function pullFromCloud(){
     const [players, games, matches] = await Promise.all(
       Object.values(SYNC_TABLES).map(t => sb(`${t}?household_id=eq.${hh}&select=id,data`))
     );
+    const cloudData = { players, games, matches };
     const cloudEmpty = players.length===0 && games.length===0 && matches.length===0;
     const localHasData = state.players.length>0 || state.games.length>0 || state.matches.length>0;
+
     if(cloudEmpty && localHasData){
       // First sync from a device with existing data: push local up instead of wiping it
       lastSynced = { players:{}, games:{}, matches:{} };
       await pushDiffs();
     } else {
-      state = {
-        players: players.map(r=>r.data),
-        games: games.map(r=>r.data),
-        matches: matches.map(r=>r.data)
-      };
+      let hadLocalWins = false;
+      const newState = { players:[], games:[], matches:[] };
+
+      ['players','games','matches'].forEach(k=>{
+        const localMap = {};
+        state[k].forEach(item=>{ localMap[item.id] = item; });
+        const cloudMap = {};
+        cloudData[k].forEach(row=>{ cloudMap[row.id] = row.data; });
+        const prevSynced = lastSynced[k] || {};
+        const newSynced = { ...prevSynced };
+
+        const allIds = new Set([...Object.keys(localMap), ...Object.keys(cloudMap), ...Object.keys(prevSynced)]);
+        const merged = [];
+
+        allIds.forEach(id=>{
+          const localItem = localMap[id];
+          const cloudItem = cloudMap[id];
+          const wasSynced = prevSynced[id];
+
+          if(localItem){
+            const localStr = JSON.stringify(localItem);
+            if(localStr !== wasSynced){
+              // Local has an edit (or is a brand-new item) the cloud never received — local wins.
+              // Leave newSynced[id] as whatever it was so pushDiffs() detects the diff and pushes it.
+              merged.push(localItem);
+              hadLocalWins = true;
+            } else if(cloudItem !== undefined){
+              // Local is unchanged since last sync — safe to adopt the cloud version.
+              merged.push(cloudItem);
+              newSynced[id] = JSON.stringify(cloudItem);
+            } else {
+              // Local unchanged, but cloud no longer has it — another device deleted it.
+              delete newSynced[id];
+            }
+          } else if(wasSynced !== undefined){
+            // Was synced before, missing locally now — WE deleted it.
+            // Local delete wins even if cloud shows a conflicting edit from elsewhere;
+            // leave newSynced[id] untouched so pushDiffs() issues the DELETE.
+            hadLocalWins = true;
+          } else if(cloudItem !== undefined){
+            // Brand new item from another device we've never seen — adopt it.
+            merged.push(cloudItem);
+            newSynced[id] = JSON.stringify(cloudItem);
+          }
+          // else: no local item, never synced, no cloud item — nothing to do
+        });
+
+        newState[k] = merged;
+        lastSynced[k] = newSynced;
+      });
+
+      state = newState;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      takeSnapshot();
+      persistLastSynced();
       setSyncStatus('synced');
+      if(hadLocalWins){
+        // push the protected local changes back up right away so the cloud catches up
+        await pushDiffs();
+      }
     }
   }catch(e){
     console.error(e);
@@ -1561,6 +1626,11 @@ function openSettingsModal(){
     codeBtn.addEventListener('click', async ()=>{
       const code = document.getElementById('familyCodeInput').value.trim().toLowerCase();
       if(!code){ toast('Enter a family code first'); return; }
+      if(code !== householdCode){
+        // Switching to a different shared dataset — old sync baseline doesn't apply anymore
+        lastSynced = { players:{}, games:{}, matches:{} };
+        persistLastSynced();
+      }
       householdCode = code;
       localStorage.setItem(HOUSEHOLD_KEY, code);
       closeModal();
@@ -1630,7 +1700,6 @@ function formatDate(iso){
 }
 
 /* ============ INIT ============ */
-takeSnapshot(); // baseline so first pushDiffs only sends real changes
 renderDashboard();
 (async function initCloud(){
   if(!cloudConfigured()) return;
@@ -1672,8 +1741,23 @@ document.addEventListener('visibilitychange', async ()=>{
     // re-render whichever view is active
     const active = document.querySelector('.nav-btn.active');
     if(active) showView(active.dataset.view);
+  } else if(document.visibilityState==='hidden' && cloudActive() && syncTimer){
+    // App is backgrounding with an unsaved change pending — push now rather than
+    // waiting out the debounce, since iOS can suspend the tab at any moment.
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    pushDiffs();
   }
 });
+// Backup for the same scenario — some mobile browsers fire pagehide instead of/before visibilitychange
+window.addEventListener('pagehide', ()=>{
+  if(cloudActive() && syncTimer){
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    pushDiffs();
+  }
+});
+
 </script>
 </body>
 </html>
